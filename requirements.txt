@@ -1,3 +1,4 @@
 minio
 openai
 requests
+transformers==4.56.1
