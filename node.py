@@ -12,6 +12,7 @@ import torch
 from io import BytesIO
 from openai import OpenAI
 import json
+import time
 
 
 # minio_config = "minio_config.json"
@@ -306,16 +307,20 @@ class DifyCn2En:
             }
 
             # 发送POST请求
-            response = requests.post(
-                f'{api_url}/cn2en/v1/workflows/run', headers=headers, json=payload, verify=False)
-
-            # 检查响应状态
-            if response.status_code == 200:
-                return (response.json()['data']['outputs']['text'],)
-            else:
-                error_message = f"请求失败，状态码: {response.status_code}, 响应: {response.text}"
-                print(error_message)
-                return (data,)
+            retry = 3
+            while retry > 0:
+                response = requests.post(
+                    f'{api_url}/cn2en/v1/workflows/run', headers=headers, json=payload, verify=False)
+                retry -= 1
+                # 检查响应状态
+                if response.status_code == 200:
+                    return (response.json()['data']['outputs']['text'],)
+                else:
+                    error_message = f"请求失败，状态码: {response.status_code}, 响应: {response.text}"
+                    print(error_message)
+                    time.sleep(3)
+            
+            return (data,)
 
         except Exception as e:
             error_message = f"发送请求时出错: {str(e)}"
@@ -381,12 +386,19 @@ class DifyImageDescribe:
         }
 
         # 发送POST请求
-        response = requests.post(
-            f'{api_url}/describe2cn/v1/workflows/run', headers=headers, json=payload, verify=False)
-
-        json = response.json()
-        print(json)
-        return (json['data']['outputs']['text'],)
+        retry = 3
+        while retry > 0:
+            response = requests.post(
+                f'{api_url}/describe2cn/v1/workflows/run', headers=headers, json=payload, verify=False)
+            retry -= 1
+            if response.status_code != 200:
+                time.sleep(1)
+                continue
+            json = response.json()
+            print(json)
+            return (json['data']['outputs']['text'],)
+        
+        raise Exception('workflows run max retries exceeded')
 
 
 class DifyImageDescribeEn:
@@ -447,12 +459,21 @@ class DifyImageDescribeEn:
         }
 
         # 发送POST请求
-        response = requests.post(
-            f'{api_url}/describe2en/v1/workflows/run', headers=headers, json=payload, verify=False)
-
-        json = response.json()
-        print(json)
-        return (json['data']['outputs']['text'],)
+        retry = 3
+        while retry > 0:
+            response = requests.post(
+                f'{api_url}/describe2en/v1/workflows/run', headers=headers, json=payload, verify=False)
+            retry -= 1
+            if response.status_code != 200:
+                print(f'Error: {response.status_code}')
+                print(response.text)
+                time.sleep(3)
+                continue
+            json = response.json()
+            print(json)
+            return (json['data']['outputs']['text'],)
+        
+        raise Exception('workflows run max retries exceeded')
 
 
 class UploadImageToNocodb:
@@ -492,12 +513,21 @@ class UploadImageToNocodb:
         }
 
         # 发送POST请求
-        response = requests.post(
-            f'{api_url}/api/v2/storage/upload', files=files, headers=headers, verify=False)
-        jsonData = response.json()
-        print(jsonData)
-        import json
-        return (json.dumps(jsonData),)
+        retry = 3
+        while retry > 0:
+            response = requests.post(
+                f'{api_url}/api/v2/storage/upload', files=files, headers=headers, verify=False)
+            retry -= 1
+            if response.status_code != 200:
+                print(f"上传失败，正在重试...({retry})")
+                time.sleep(1)
+                continue
+            jsonData = response.json()
+            print(jsonData)
+            import json
+            return (json.dumps(jsonData),)
+        
+        raise Exception('workflows run max retries exceeded')
 
 def process_sam2_segmentation(image, points, model, processor, device):
     """使用SAM2模型处理分割"""
