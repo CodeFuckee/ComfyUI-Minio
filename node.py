@@ -904,4 +904,6 @@ class NanoBananaPro:
             out_path = OUT_DIR / f"extracted_image_{i}.png"
             out_path.write_bytes(img_bytes)
             print(f"saved: {out_path.resolve()}")
+
+        text = re.sub(r"data:image/[^;]+;base64,", "", text).strip()
         return (response , text,)
