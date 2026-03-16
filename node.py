@@ -814,7 +814,7 @@ class NanoBananaPro:
     RETURN_TYPES = ("STRING", 'STRING',)
     RETURN_NAMES = ("response", "image",)
 
-    def main(self, mime_type: str, image_b64: str, prompt: str, aspectRatio: str = '9:16', imageSize: str = '2k'):
+    def main(self, mimeType: str, imageBase64: str, prompt: str, aspectRatio: str = '9:16', imageSize: str = '2k'):
         import http.client
         import json
         import os
@@ -836,8 +836,8 @@ class NanoBananaPro:
                         },
                         {
                             "inline_data": {
-                                "mime_type": mime_type,
-                                "data": image_b64,
+                                "mime_type": mimeType,
+                                "data": imageBase64,
                             }
                         },
                     ]
