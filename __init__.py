@@ -11,6 +11,7 @@ NODE_CLASS_MAPPINGS = {
     "Dify Image Describe En": DifyImageDescribeEn,
     "Upload Image To Nocodb": UploadImageToNocodb,
     "Sam Image Predict": SamImagePredict,
+    "Nano Banana Pro": NanoBananaPro,
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
     # "Set Minio Config": "Set Minio Config",
