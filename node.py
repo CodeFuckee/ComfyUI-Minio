@@ -865,7 +865,7 @@ class NanoBananaPro:
 
         for attempt in range(max_retries):
             try:
-                conn = http.client.HTTPSConnection("api.easyart.cc", timeout=60)
+                conn = http.client.HTTPSConnection("api.easyart.cc", timeout=6000)
                 conn.request("POST", "/v1beta/models/gemini-3-pro-image-preview:generateContent", payload, headers)
                 res = conn.getresponse()
                 res_status = getattr(res, "status", None)
