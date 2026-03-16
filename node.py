@@ -1,18 +1,15 @@
-from transformers import Sam2Processor, Sam2Model
-import torch
-from PIL import Image
-import numpy as np
 import os
-import requests
-from pathlib import Path
-from .core.minio_prodogape import MinioHandler
-
-import time
-import torch
-from io import BytesIO
-from openai import OpenAI
 import json
 import time
+import torch
+import requests
+import numpy as np
+from PIL import Image
+from io import BytesIO
+from pathlib import Path
+from openai import OpenAI
+from .core.minio_prodogape import MinioHandler
+from transformers import Sam2Processor, Sam2Model
 
 
 # minio_config = "minio_config.json"
@@ -546,7 +543,6 @@ def process_sam2_segmentation(image, points, model, processor, device):
     masks = processor.post_process_masks(outputs.pred_masks.cpu(), inputs["original_sizes"])[0]
     return masks
 
-
 def save_results(image_array, masks, points, output_dir, output_type="all", mask_indices=None):
     """保存分割结果
     
@@ -649,6 +645,7 @@ def pil2mask(image):
     image_np = np.array(image.convert("L")).astype(np.float32) / 255.0
     mask = torch.from_numpy(image_np)
     return 1.0 - mask
+
 
 class SamImagePredict:
 
@@ -770,3 +767,141 @@ class SamImagePredict:
             print(str(e))
         
         return (output_image , masks[0][indics], '',)
+
+
+class NanoBananaPro:
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "mimeType": (
+                    "STRING",
+                    {
+                        "default": "image/png",
+                    },
+                ),
+                "imageBase64": (
+                    "STRING",
+                    {
+                        "default": "-1",
+                    },
+                ),
+                "prompt": (
+                    "STRING",
+                    {
+                        "default": "-1",
+                    },
+                ),
+                "aspectRatio": (
+                    "STRING",
+                    {
+                        "default": "9:16",
+                    },
+                ),
+                "imageSize": (
+                    "STRING",
+                    {
+                        "default": "2k",
+                    },
+                ),
+            },
+        }
+
+    CATEGORY = "ComfyUI-Minio"
+    FUNCTION = "main"
+
+    RETURN_TYPES = ("STRING", 'STRING',)
+    RETURN_NAMES = ("response", "image",)
+
+    def main(self, mime_type: str, image_b64: str, prompt: str, aspectRatio: str = '9:16', imageSize: str = '2k'):
+        import http.client
+        import json
+        import os
+        import base64
+        import urllib.request
+
+        conn = http.client.HTTPSConnection("api.easyart.cc")
+        api_key = os.getenv("EASYART_API_KEY")
+        if not api_key:
+            raise RuntimeError("缺少环境变量 EASYART_API_KEY")
+
+        payload = json.dumps({
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "text": f"'{prompt}"
+                        },
+                        {
+                            "inline_data": {
+                                "mime_type": mime_type,
+                                "data": image_b64,
+                            }
+                        },
+                    ]
+                }
+            ],
+            "generationConfig": {
+                "responseModalities": [
+                    "TEXT",
+                    "IMAGE"
+                ],
+                "imageConfig": {
+                    "aspectRatio": f"{aspectRatio}",
+                    "imageSize": f"{imageSize}"
+                }
+            }
+        })
+        headers = {
+            'Authorization': api_key,
+            'Content-Type': 'application/json'
+        }
+        conn.request("POST", "/v1beta/models/gemini-3-pro-image-preview:generateContent", payload, headers)
+        res = conn.getresponse()
+        data = res.read()
+        with open("response.json", "w", encoding="utf-8") as f:
+            f.write(data.decode("utf-8"))
+        print(data)
+        import re
+        import json
+        import base64
+        from pathlib import Path
+
+        JSON_PATH = Path("response.json")
+        OUT_DIR = Path(".")
+        OUT_DIR.mkdir(parents=True, exist_ok=True)
+
+        data = json.loads(JSON_PATH.read_text(encoding="utf-8"))
+
+        # 取 candidates[0].content.parts[*].text，里面是 markdown
+        parts = (
+            data.get("candidates", [{}])[0]
+                .get("content", {})
+                .get("parts", [])
+        )
+
+        text = "\n".join(p.get("inlineData", {}).get('data','') for p in parts if isinstance(p, dict))
+        response = "".join(p.get("text") for p in parts if isinstance(p, dict) and 'text' in p)
+        # 匹配 data:image/<ext>;base64,<payload>
+        pattern = re.compile(r"data:image/(?P<ext>png|jpeg|jpg|webp|gif);base64,(?P<b64>[A-Za-z0-9+/=\s]+)")
+
+        matches = list(pattern.finditer(text))
+        if not matches:
+            cleaned = re.sub(r"\s+", "", text)
+            if not cleaned:
+                raise SystemExit("没有在 JSON 里找到可用的 base64 图片数据")
+            text = f"data:image/png;base64,{cleaned}"
+            matches = list(pattern.finditer(text))
+            if not matches:
+                raise SystemExit("没有在 JSON 里找到 data:image/...;base64 的图片数据")
+
+        for i, m in enumerate(matches, start=1):
+            b64_payload = re.sub(r"\s+", "", m.group("b64"))
+            img_bytes = base64.b64decode(b64_payload)
+
+            out_path = OUT_DIR / f"extracted_image_{i}.png"
+            out_path.write_bytes(img_bytes)
+            print(f"saved: {out_path.resolve()}")
+        return (response , text,)
