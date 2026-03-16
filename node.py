@@ -821,7 +821,6 @@ class NanoBananaPro:
         import base64
         import urllib.request
 
-        conn = http.client.HTTPSConnection("api.easyart.cc")
         api_key = os.getenv("EASYART_API_KEY")
         if not api_key:
             raise RuntimeError("缺少环境变量 EASYART_API_KEY")
@@ -858,12 +857,47 @@ class NanoBananaPro:
             'Authorization': api_key,
             'Content-Type': 'application/json'
         }
-        conn.request("POST", "/v1beta/models/gemini-3-pro-image-preview:generateContent", payload, headers)
-        res = conn.getresponse()
-        data = res.read()
+        max_retries = 3
+        retryable_statuses = {429, 502, 503, 504}
+        last_exception = None
+        data = b""
+        res_status = None
+
+        for attempt in range(max_retries):
+            try:
+                conn = http.client.HTTPSConnection("api.easyart.cc", timeout=60)
+                conn.request("POST", "/v1beta/models/gemini-3-pro-image-preview:generateContent", payload, headers)
+                res = conn.getresponse()
+                res_status = getattr(res, "status", None)
+                data = res.read()
+
+                if res_status == 200:
+                    break
+
+                if res_status in retryable_statuses and attempt < (max_retries - 1):
+                    time.sleep(2 ** attempt)
+                    continue
+
+                error_text = data.decode("utf-8", errors="replace") if data else ""
+                raise RuntimeError(f"请求失败，状态码: {res_status}, 响应: {error_text[:2000]}")
+            except Exception as e:
+                last_exception = e
+                if attempt < (max_retries - 1):
+                    time.sleep(2 ** attempt)
+                    continue
+                raise
+            finally:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+
+        decoded_data = data.decode("utf-8", errors="replace") if data else ""
         with open("response.json", "w", encoding="utf-8") as f:
-            f.write(data.decode("utf-8"))
+            f.write(decoded_data)
         print(data)
+        if res_status != 200:
+            raise RuntimeError(f"请求失败，重试后仍未成功: {last_exception}")
         import re
         import json
         import base64
