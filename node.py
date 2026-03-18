@@ -967,7 +967,7 @@ class NanoBananaPro2:
                         "default": "image/png",
                     },
                 ),
-                "imageBase6412": (
+                "imageBase642": (
                     "STRING",
                     {
                         "default": "-1",
