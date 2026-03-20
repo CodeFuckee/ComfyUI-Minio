@@ -13,6 +13,8 @@ NODE_CLASS_MAPPINGS = {
     "Sam Image Predict": SamImagePredict,
     "Nano Banana Pro": NanoBananaPro,
     "Nano Banana Pro 2 Pic": NanoBananaPro2,
+    "Nano Banana Pro Grsai Api": NanoBananaProGrsai,
+    "Nano Banana Pro 2 Pic Grsai Api": NanoBananaProGrsai,
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
     # "Set Minio Config": "Set Minio Config",
