@@ -1275,10 +1275,10 @@ class NanoBananaProCombine:
                 res = conn.getresponse()
                 res_status = getattr(res, "status", None)
                 data = res.read()
-
-                if res_status == 200:
+                decoded_data_test = data.decode("utf-8", errors="replace") if data else ""
+                if res_status == 200 and decoded_data_test != "":
                     break
-
+                print(f'状态码{res_status}')
                 if res_status in retryable_statuses and attempt < (max_retries - 1):
                     time.sleep(2 ** attempt)
                     continue
