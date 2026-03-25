@@ -1270,7 +1270,7 @@ class NanoBananaProCombine:
                 api_host = self.get_api_host(api_source)
                 headers = self.get_header(api_source)
                 model_name = self.get_model_name(api_source, model)
-                conn = http.client.HTTPSConnection(api_host, timeout=6000)
+                conn = http.client.HTTPSConnection(api_host, timeout=600)
                 conn.request("POST", f"/v1beta/models/{model_name}:generateContent", payload, headers)
                 res = conn.getresponse()
                 res_status = getattr(res, "status", None)
@@ -1286,6 +1286,7 @@ class NanoBananaProCombine:
                 error_text = data.decode("utf-8", errors="replace") if data else ""
                 raise RuntimeError(f"请求失败，状态码: {res_status}, 响应: {error_text[:2000]}")
             except Exception as e:
+                print('请求失败'+str(e))
                 last_exception = e
                 if attempt < (max_retries - 1):
                     time.sleep(2 ** attempt)
