@@ -4,6 +4,8 @@ import json
 import time
 import torch
 import base64
+import string
+import secrets
 import requests
 import http.client
 import numpy as np
@@ -14,6 +16,11 @@ from pathlib import Path
 from openai import OpenAI
 from .core.minio_prodogape import MinioHandler
 from transformers import Sam2Processor, Sam2Model
+
+def generate_random_string(length=128):
+    """生成指定长度的随机字符串，默认128位"""
+    alphabet = string.ascii_letters + string.digits
+    return ''.join(secrets.choice(alphabet) for _ in range(length))
 
 
 # minio_config = "minio_config.json"
@@ -926,8 +933,8 @@ class NanoBananaPro:
         for i, m in enumerate(matches, start=1):
             b64_payload = re.sub(r"\s+", "", m.group("b64"))
             img_bytes = base64.b64decode(b64_payload)
-
-            out_path = OUT_DIR / f"extracted_image_{i}.png"
+            tt = generate_random_string()
+            out_path = OUT_DIR / f"extracted_image_{tt}.png"
             out_path.write_bytes(img_bytes)
             print(f"saved: {out_path.resolve()}")
 
@@ -1108,8 +1115,8 @@ class NanoBananaPro2:
         for i, m in enumerate(matches, start=1):
             b64_payload = re.sub(r"\s+", "", m.group("b64"))
             img_bytes = base64.b64decode(b64_payload)
-
-            out_path = OUT_DIR / f"extracted_image_{i}.png"
+            tt = generate_random_string()
+            out_path = OUT_DIR / f"extracted_image_{tt}.png"
             out_path.write_bytes(img_bytes)
             print(f"saved: {out_path.resolve()}")
 
@@ -1322,8 +1329,8 @@ class NanoBananaProCombine:
         for i, m in enumerate(matches, start=1):
             b64_payload = re.sub(r"\s+", "", m.group("b64"))
             img_bytes = base64.b64decode(b64_payload)
-
-            out_path = OUT_DIR / f"extracted_image_{i}.png"
+            tt = generate_random_string()
+            out_path = OUT_DIR / f"extracted_image_{tt}.png"
             out_path.write_bytes(img_bytes)
             print(f"saved: {out_path.resolve()}")
 
