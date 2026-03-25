@@ -1254,7 +1254,6 @@ class NanoBananaProCombine:
             }
         }
         payload = json.dumps(payload_json)
-        headers = self.get_header(api_source)
         max_retries = 3
         retryable_statuses = {429, 502, 503, 504}
         last_exception = None
@@ -1263,8 +1262,15 @@ class NanoBananaProCombine:
 
         for attempt in range(max_retries):
             try:
-                conn = http.client.HTTPSConnection(self.get_api_host(api_source), timeout=6000)
+                print("第一次尝试请求：", attempt == 0)
+                if attempt == 0:
+                    api_source = 'grsai'
+                else:
+                    api_source = 'modelhub'
+                api_host = self.get_api_host(api_source)
+                headers = self.get_header(api_source)
                 model_name = self.get_model_name(api_source, model)
+                conn = http.client.HTTPSConnection(api_host, timeout=6000)
                 conn.request("POST", f"/v1beta/models/{model_name}:generateContent", payload, headers)
                 res = conn.getresponse()
                 res_status = getattr(res, "status", None)
