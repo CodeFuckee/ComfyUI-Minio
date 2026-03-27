@@ -1265,6 +1265,10 @@ class NanoBananaProCombine:
                 print("第一次尝试请求：", attempt == 0)
                 if attempt == 0:
                     api_source = 'grsai'
+                elif model == 'nano banana pro vt':
+                    api_source = 'grsai'
+                elif model == 'nano banana pro vt':
+                    api_source = 'grsai'
                 else:
                     api_source = 'modelhub'
                 api_host = self.get_api_host(api_source)
@@ -1298,9 +1302,9 @@ class NanoBananaProCombine:
                 except Exception:
                     pass
 
-        decoded_data = data.decode("utf-8", errors="replace") if data else ""
-        with open("response.json", "w", encoding="utf-8") as f:
-            f.write(decoded_data)
+        # decoded_data = data.decode("utf-8", errors="replace") if data else ""
+        # with open("response.json", "w", encoding="utf-8") as f:
+        #     f.write(decoded_data)
         print(data)
         if res_status != 200:
             raise RuntimeError(f"请求失败，重试后仍未成功: {last_exception}")
@@ -1334,11 +1338,11 @@ class NanoBananaProCombine:
                 raise SystemExit("没有在 JSON 里找到 data:image/...;base64 的图片数据")
 
         for i, m in enumerate(matches, start=1):
-            b64_payload = re.sub(r"\s+", "", m.group("b64"))
-            img_bytes = base64.b64decode(b64_payload)
+            # b64_payload = re.sub(r"\s+", "", m.group("b64"))
+            # img_bytes = base64.b64decode(b64_payload)
             tt = generate_random_string()
             out_path = OUT_DIR / f"extracted_image_{tt}.png"
-            out_path.write_bytes(img_bytes)
+            # out_path.write_bytes(img_bytes)
             print(f"saved: {out_path.resolve()}")
 
         text = re.sub(r"data:image/[^;]+;base64,", "", text).strip()
