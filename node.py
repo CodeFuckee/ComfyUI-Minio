@@ -1302,18 +1302,18 @@ class NanoBananaProCombine:
                 except Exception:
                     pass
 
-        # decoded_data = data.decode("utf-8", errors="replace") if data else ""
+        decoded_data = data.decode("utf-8", errors="replace") if data else ""
         # with open("response.json", "w", encoding="utf-8") as f:
         #     f.write(decoded_data)
         print(data)
         if res_status != 200:
             raise RuntimeError(f"请求失败，重试后仍未成功: {last_exception}")
 
-        JSON_PATH = Path("response.json")
-        OUT_DIR = Path(".")
-        OUT_DIR.mkdir(parents=True, exist_ok=True)
+        # JSON_PATH = Path("response.json")
+        # OUT_DIR = Path(".")
+        # OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-        data = json.loads(JSON_PATH.read_text(encoding="utf-8"))
+        data = json.loads(decoded_data)
 
         # 取 candidates[0].content.parts[*].text，里面是 markdown
         parts = (
