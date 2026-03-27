@@ -1331,11 +1331,15 @@ class NanoBananaProCombine:
         if not matches:
             cleaned = re.sub(r"\s+", "", text)
             if not cleaned:
-                raise SystemExit("没有在 JSON 里找到可用的 base64 图片数据")
+                print("没有在 JSON 里找到 data:image/...;base64 的图片数据")
+                return ("", "", )
+                # raise SystemExit("没有在 JSON 里找到可用的 base64 图片数据")
             text = f"data:image/png;base64,{cleaned}"
             matches = list(pattern.finditer(text))
             if not matches:
-                raise SystemExit("没有在 JSON 里找到 data:image/...;base64 的图片数据")
+                print("没有在 JSON 里找到 data:image/...;base64 的图片数据")
+                return ("", "", )
+                # raise SystemExit("没有在 JSON 里找到 data:image/...;base64 的图片数据")
 
         for i, m in enumerate(matches, start=1):
             # b64_payload = re.sub(r"\s+", "", m.group("b64"))
