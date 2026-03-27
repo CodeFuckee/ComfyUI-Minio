@@ -1341,13 +1341,13 @@ class NanoBananaProCombine:
                 return ("", "", )
                 # raise SystemExit("没有在 JSON 里找到 data:image/...;base64 的图片数据")
 
-        for i, m in enumerate(matches, start=1):
-            # b64_payload = re.sub(r"\s+", "", m.group("b64"))
-            # img_bytes = base64.b64decode(b64_payload)
-            tt = generate_random_string()
-            out_path = OUT_DIR / f"extracted_image_{tt}.png"
-            # out_path.write_bytes(img_bytes)
-            print(f"saved: {out_path.resolve()}")
+        # for i, m in enumerate(matches, start=1):
+        #     # b64_payload = re.sub(r"\s+", "", m.group("b64"))
+        #     # img_bytes = base64.b64decode(b64_payload)
+        #     tt = generate_random_string()
+        #     # out_path = OUT_DIR / f"extracted_image_{tt}.png"
+        #     # out_path.write_bytes(img_bytes)
+        #     # print(f"saved: {out_path.resolve()}")
 
         text = re.sub(r"data:image/[^;]+;base64,", "", text).strip()
         return (response , text,)
