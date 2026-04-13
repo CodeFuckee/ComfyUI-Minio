@@ -1531,7 +1531,7 @@ class NanoBananaProCombine2:
                 except Exception:
                     pass
         decoded_data = data.decode("utf-8", errors="replace") if data else ""
-        print(data)
+        # print(data)
         if res_status != 200:
             raise RuntimeError(f"请求失败，重试后仍未成功: {last_exception}")
         data = json.loads(decoded_data)
@@ -1557,5 +1557,24 @@ class NanoBananaProCombine2:
             if not matches:
                 print("没有在 JSON 里找到 data:image/...;base64 的图片数据")
                 return ("", "", )
-        text = re.sub(r"data:image/[^;]+;base64,", "", text).strip()
-        return (response , text,)
+        text = re.sub(r"data:image/[^;]+;base64,", "", text).strip() 
+        try:
+            try:
+                img_bytes = base64.b64decode(text, validate=True)
+            except Exception:
+                img_bytes = base64.urlsafe_b64decode(text + "===")
+            img = Image.open(BytesIO(img_bytes))
+            img.load()
+            buf = BytesIO()
+            img.save(buf, format="PNG")
+            png_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+            return (response, png_b64,)
+        except Exception:
+            ts = time.strftime("%Y%m%d%H%M%S", time.localtime())
+            rand6 = f"{secrets.randbelow(1000000):06d}"
+            debug_name = f"{ts}{rand6}.json"
+            Path(debug_name).write_text(
+                json.dumps({"response": response, "data": data}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            return (response, text,)
