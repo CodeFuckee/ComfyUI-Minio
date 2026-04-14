@@ -2,3 +2,4 @@ minio
 openai
 requests
 transformers==4.56.1
+volcengine-python-sdk[ark]

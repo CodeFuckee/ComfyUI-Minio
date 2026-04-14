@@ -2,20 +2,47 @@ import os
 import re
 import json
 import time
+from turtle import mode
 import torch
+import random
 import base64
 import string
 import secrets
 import requests
+import mimetypes
 import http.client
 import numpy as np
-import urllib.request
 from PIL import Image
 from io import BytesIO
 from pathlib import Path
 from openai import OpenAI
+from datetime import datetime
 from .core.minio_prodogape import MinioHandler
 from transformers import Sam2Processor, Sam2Model
+
+if not os.path.exists("debug"):
+    os.mkdir("debug")
+if not os.path.exists("temp"):
+    os.mkdir("temp")
+
+def download(img_url: str, save_path: str) -> bool:
+    count = 0
+    while count <= 5:
+        try:
+            response = requests.get(img_url, stream=True)
+            if response.status_code == 200:
+                if os.path.exists(save_path):
+                    return True
+                print(save_path)
+                with open(save_path, "wb") as f:
+                    f.write(response.content)
+            time.sleep(3)
+            return True
+        except Exception as e:
+            count += 1
+            print(str(e))
+            time.sleep(3)
+    return False
 
 def generate_random_string(length=128):
     """生成指定长度的随机字符串，默认128位"""
@@ -1352,9 +1379,6 @@ class NanoBananaProCombine:
         text = re.sub(r"data:image/[^;]+;base64,", "", text).strip()
         return (response , text,)
 
-
-
-
 class NanoBananaProCombine2:
 
     @classmethod
@@ -1578,3 +1602,216 @@ class NanoBananaProCombine2:
                 encoding="utf-8",
             )
             return (response, text,)
+
+
+
+
+class VideoCombine:
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "line": (["fast", "stable"],),
+                "model": (["veo-3.1-fast-generate-preview", "veo-3.1-generate-preview", "veo3.1", "veo3.1-4k", "veo3.1-fast", "veo3.1-pro", "veo3.1-pro-4k", "doubao-seedance-2-0-fast-260128", "doubao-seedance-2-0-260128"],),
+                "imageBase64": (
+                    "STRING",
+                    {
+                        "default": "-1",
+                    },
+                ),
+                "imageBase64_1": (
+                    "STRING",
+                    {
+                        "default": "-1",
+                    },
+                ),
+                "prompt": (
+                    "STRING",
+                    {
+                        "default": "-1",
+                    },
+                ),
+                "second": (
+                    "STRING",
+                    {
+                        "default": "5",
+                    },
+                ),
+                "aspectRatio": (
+                    "STRING",
+                    {
+                        "default": "9:16",
+                    },
+                ),
+                "resolution": (["480p", "720p"],),
+            },
+        }
+
+    CATEGORY = "ComfyUI-Minio"
+    FUNCTION = "main"
+
+    RETURN_TYPES = ("STRING", 'STRING',)
+    RETURN_NAMES = ("response", "image",)
+    
+    def get_api_host(self, line: str = 'stable') -> str:
+        return 'api.easyart.cc'
+
+    def base64_to_image(self, base64_str: str, save_path: str):
+        """
+        将 Base64 字符串解码为图片并保存到本地
+        
+        Args:
+            base64_str: 图片的 base64 字符串（可带 data:image 前缀）
+            save_path: 保存路径，如 "./output.png" 或 "test.jpg"
+        """
+        # 去掉 base64 前缀（data:image/png;base64, 这类）
+        base64_data = re.sub(r'^data:image/\w+;base64,', '', base64_str)
+        
+        # 解码
+        img_data = base64.b64decode(base64_data)
+        
+        # 写入文件
+        with open(save_path, 'wb') as f:
+            f.write(img_data)
+
+        print(f"图片已保存至：{save_path}")
+    
+    # 视频生成的比例
+    def create_veo_task(self, model: str = 'veo3.1', prompt: str = '', second: str = "8", aspectRatio: str = "16x9", image_paths: list[str] = []):
+        url = "https://api.easyart.cc/v1/videos"
+        # 1. 准备普通的表单数据
+        payload = {
+            'model': model,
+            'prompt': prompt,
+            'seconds': second,
+            'size': aspectRatio,
+            'watermark': 'false'
+        }
+
+        files = []
+        opened_files = []
+        
+        try:
+            for i, path in enumerate(image_paths):
+                if not os.path.exists(path):
+                    print(f"警告: 找不到图片 {path}")
+                    continue
+                    
+                mime_type = mimetypes.guess_type(path)[0] or 'application/octet-stream'
+                f = open(path, 'rb')
+                opened_files.append(f)
+                
+                # 默认使用 'input_reference' 作为字段名
+                # 如果 API 要求多张图使用不同字段名（如 input_reference_1, input_reference_2），可修改为 f'input_reference_{i+1}'
+                field_name = 'input_reference' 
+                files.append((field_name, (os.path.basename(path), f, mime_type)))
+            veo_key = os.getenv("EASYART_DEFAULT_API_KEY")
+            headers = {
+                'Authorization': f'Bearer {veo_key}'
+                # 注意：使用 requests 时不要手动设置 Content-Type 为 multipart/form-data
+                # requests 会自动设置正确的 Content-Type 并带上 boundary
+            }
+
+            print("正在提交任务...")
+            response = requests.post(url, headers=headers, data=payload, files=files)
+            print("响应:", response.text)
+            
+            return response.json()
+            
+        finally:
+            # 确保文件被关闭
+            for f in opened_files:
+                f.close()
+    
+    def poll_task_status(self, task_id) -> tuple[str, str]:
+        url = f"https://api.easyart.cc/v1/videos/{task_id}"
+        veo_key = os.getenv("EASYART_DEFAULT_API_KEY")
+        headers = {
+            'Accept': 'application/json',
+            'Authorization': f'Bearer {veo_key}',
+            'Content-Type': 'application/json'
+        }
+        # 原代码中 GET 请求带了 body
+        payload = {
+            "model": "string"
+        }
+        
+        while True:
+            response = requests.get(url, headers=headers, json=payload)
+            print(response.text)
+            json_data = json.loads(response.text)
+            if 'status' in json_data:
+                if json_data['status'] == 'completed':
+                    video_url = json_data['video_url']
+                    return response.text, video_url
+                elif json_data['status'] == 'error':
+                    break
+            time.sleep(30)
+        
+        return "", ""
+    
+    def get_time_random_str(self) -> str:
+        """
+        生成字符串：当前时间（精确到毫秒） + 16位随机数字
+        格式示例：20250320145832123_1234567890123456
+        """
+        # 1. 获取当前时间，精确到毫秒，格式：年月日时分秒毫秒
+        now = datetime.now()
+        time_str = now.strftime("%Y%m%d%H%M%S%f")[:-3]  # 截取到毫秒（3位）
+        # 2. 生成 16 位随机数字字符串
+        random_16 = generate_random_string(16)
+        # 3. 拼接成最终字符串（用下划线分隔，方便阅读）
+        result = f"{time_str}_{random_16}"
+        return result
+
+    def main(self, line: str, model: str, imageBase64: str, imageBase64_1: str, prompt: str, second: str, aspectRatio: str = '9:16', resolution: str = '480p'):
+        image_paths = []
+        if imageBase64 != '-1' and imageBase64 != '':
+            file_name = "temp/" + self.get_time_random_str() + ".png"
+            self.base64_to_image(imageBase64, file_name)
+            image_paths.append(file_name)
+            
+        if imageBase64_1 != '-1' and imageBase64_1 != '':
+            file_name = "temp/" + self.get_time_random_str() + ".png"
+            self.base64_to_image(imageBase64, file_name)
+            image_paths.append(file_name)
+        
+        max_retries = 3
+        last_exception = None
+        data = b""
+        res_status = None
+        task_id = ""
+        for attempt in range(max_retries):
+            try:
+                result = self.create_veo_task(model, prompt, second, aspectRatio, image_paths)
+                if 'id' in result:
+                    task_id = result['id']
+                    break
+                else:
+                    print("任务提交失败，未能获取到任务ID")
+                
+            except Exception as e:
+                print('请求失败'+str(e))
+                last_exception = e
+                if attempt < (max_retries - 1):
+                    time.sleep(2 ** attempt)
+                    continue
+                raise
+            finally:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+        
+        print(f"任务提交成功，任务ID: {task_id}")
+        print("开始轮询任务状态...")
+        response_text, video_url = self.poll_task_status(task_id)
+        if video_url == "":
+            with open("debug/error_" + self.get_time_random_str()+".json", "w+") as f:
+                f.write(response_text)
+            raise Exception("生成失败")
+        
+        video_path = "temp/" + self.get_time_random_str() + ".mp4"
+        download(video_url,video_path)
+        return video_path
