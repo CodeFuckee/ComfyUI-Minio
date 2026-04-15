@@ -1671,9 +1671,74 @@ class VideoCombine:
             f.write(img_data)
 
         print(f"图片已保存至：{save_path}")
+
+
+    def create_video_task_no_img(self, model: str = 'veo3.1', prompt: str = '', second: str = "8", aspectRatio: str = "16x9"):
+        import http.client
+        from codecs import encode
+
+        if model in ['veo3.1', 'veo3.1-pro', 'veo3.1-fast', 'veo-3.1-fast-generate-preview', 'veo-3.1-generate-preview']:
+            arrs = aspectRatio.split(':')
+            if len(arrs) == 2:
+                aspectRatio = str(arrs[0]) + "x" + str(arrs[1])
+        
+        conn = http.client.HTTPSConnection("api.easyart.cc")
+        dataList = []
+        boundary = 'wL36Yn8afVp8Ag7AmP8qZ0SA4n1v9T'
+        dataList.append(encode('--' + boundary))
+        dataList.append(encode('Content-Disposition: form-data; name=model;'))
+
+        dataList.append(encode('Content-Type: {}'.format('text/plain')))
+        dataList.append(encode(''))
+
+        dataList.append(encode(model))
+        dataList.append(encode('--' + boundary))
+        dataList.append(encode('Content-Disposition: form-data; name=prompt;'))
+
+        dataList.append(encode('Content-Type: {}'.format('text/plain')))
+        dataList.append(encode(''))
+
+        dataList.append(encode(prompt))
+        dataList.append(encode('--' + boundary))
+        dataList.append(encode('Content-Disposition: form-data; name=seconds;'))
+
+        dataList.append(encode('Content-Type: {}'.format('text/plain')))
+        dataList.append(encode(''))
+
+        dataList.append(encode(second))
+        dataList.append(encode('--' + boundary))
+        dataList.append(encode('Content-Disposition: form-data; name=size;'))
+
+        dataList.append(encode('Content-Type: {}'.format('text/plain')))
+        dataList.append(encode(''))
+
+        dataList.append(encode(aspectRatio))
+        dataList.append(encode('--' + boundary))
+        dataList.append(encode('Content-Disposition: form-data; name=watermark;'))
+
+        dataList.append(encode('Content-Type: {}'.format('text/plain')))
+        dataList.append(encode(''))
+
+        dataList.append(encode("false"))
+        dataList.append(encode('--'+boundary+'--'))
+        dataList.append(encode(''))
+        body = b'\r\n'.join(dataList)
+        payload = body
+        veo_key = os.getenv("EASYART_DEFAULT_API_KEY")
+        headers = {
+            'Authorization': f'Bearer {veo_key}',
+            'Content-type': 'multipart/form-data; boundary={}'.format(boundary)
+        }
+        print("正在提交任务...")
+        conn.request("POST", "/v1/videos", payload, headers)
+        res = conn.getresponse()
+        data = res.read()
+        json_text = data.decode("utf-8")
+        print("响应:", json_text)
+        return json.loads(json_text)
     
     # 视频生成的比例
-    def create_veo_task(self, model: str = 'veo3.1', prompt: str = '', second: str = "8", aspectRatio: str = "16x9", image_paths: list[str] = []):
+    def create_veo_task_with_img(self, model: str = 'veo3.1', prompt: str = '', second: str = "8", aspectRatio: str = "16x9", image_paths: list[str] = []):
         url = "https://api.easyart.cc/v1/videos"
         # 1. 准备普通的表单数据
         if model in ['veo3.1', 'veo3.1-pro', 'veo3.1-fast', 'veo-3.1-fast-generate-preview', 'veo-3.1-generate-preview']:
@@ -1722,6 +1787,11 @@ class VideoCombine:
             # 确保文件被关闭
             for f in opened_files:
                 f.close()
+    
+    def create_veo_task(self, model: str = 'veo3.1', prompt: str = '', second: str = "8", aspectRatio: str = "16x9", image_paths: list[str] = []):
+        if len(image_paths) == 0:
+            return self.create_video_task_no_img(model, prompt, second, aspectRatio)
+        return self.create_veo_task_with_img(model, prompt, second, aspectRatio, image_paths)
     
     def poll_task_status(self, task_id) -> tuple[str, str]:
         url = f"https://api.easyart.cc/v1/videos/{task_id}"
