@@ -15,6 +15,7 @@ NODE_CLASS_MAPPINGS = {
     "Nano Banana Pro 2 Pic": NanoBananaPro2,
     "Nano Banana Pro Combine": NanoBananaProCombine,
     "Nano Banana Pro Combine V2": NanoBananaProCombine2,
+    "Video Combine": VideoCombine,
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
     # "Set Minio Config": "Set Minio Config",

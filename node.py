@@ -1638,12 +1638,7 @@ class VideoCombine:
                         "default": "5",
                     },
                 ),
-                "aspectRatio": (
-                    "STRING",
-                    {
-                        "default": "9:16",
-                    },
-                ),
+                "aspectRatio": (["1:1", "3:2", "16:9", "9:16"],),
                 "resolution": (["480p", "720p"],),
             },
         }
@@ -1747,6 +1742,8 @@ class VideoCombine:
                     return response.text, video_url
                 elif json_data['status'] == 'error':
                     break
+            elif 'error' in json_data:
+                raise Exception(json_data['error']['code'])
             time.sleep(30)
         
         return "", ""
@@ -1782,12 +1779,15 @@ class VideoCombine:
         data = b""
         res_status = None
         task_id = ""
+        result = ""
         for attempt in range(max_retries):
             try:
                 result = self.create_veo_task(model, prompt, second, aspectRatio, image_paths)
                 if 'id' in result:
                     task_id = result['id']
                     break
+                elif 'error' in result:
+                    raise Exception(result['error']['message'])
                 else:
                     print("任务提交失败，未能获取到任务ID")
                 
@@ -1814,4 +1814,4 @@ class VideoCombine:
         
         video_path = "temp/" + self.get_time_random_str() + ".mp4"
         download(video_url,video_path)
-        return video_path
+        return json.dumps(result), video_path
