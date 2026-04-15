@@ -1886,6 +1886,6 @@ class VideoCombine:
                 f.write(response_text)
             raise Exception("生成失败")
         
-        video_path = "temp/" + self.get_time_random_str() + ".mp4"
+        video_path = os.path.abspath(os.path.join("temp", self.get_time_random_str() + ".mp4"))
         download(video_url,video_path)
         return json.dumps(result), video_path
