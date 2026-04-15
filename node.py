@@ -1676,6 +1676,10 @@ class VideoCombine:
     def create_veo_task(self, model: str = 'veo3.1', prompt: str = '', second: str = "8", aspectRatio: str = "16x9", image_paths: list[str] = []):
         url = "https://api.easyart.cc/v1/videos"
         # 1. 准备普通的表单数据
+        if model in ['veo3.1', 'veo3.1-pro', 'veo3.1-fast', 'veo-3.1-fast-generate-preview', 'veo-3.1-generate-preview']:
+            arrs = aspectRatio.split(':')
+            if len(arrs) == 2:
+                aspectRatio = str(arrs[0]) + "x" + str(arrs[1])
         payload = {
             'model': model,
             'prompt': prompt,
