@@ -1916,7 +1916,7 @@ class VideoCombine:
             "content": content,
             "generate_audio": True,
             "ratio": ratio,
-            "duration": second,
+            "duration": int(second),
             "watermark": False
         })
         headers = {
