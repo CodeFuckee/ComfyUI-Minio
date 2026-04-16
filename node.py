@@ -1823,7 +1823,36 @@ class VideoCombine:
             return self.create_video_task_no_img(model, prompt, second, aspectRatio)
         return self.create_veo_task_with_img(model, prompt, second, aspectRatio, image_paths)
     
-    def poll_task_status(self, task_id) -> tuple[str, str]:
+    def poll_seedance_task_status(self, task_id) -> tuple[str, str]:
+        url = f"https://api.easyart.cc/v1/videos/{task_id}"
+        veo_key = os.getenv("EASYART_DEFAULT_API_KEY")
+        headers = {
+            'Accept': 'application/json',
+            'Authorization': f'Bearer {veo_key}',
+            'Content-Type': 'application/json'
+        }
+        # 原代码中 GET 请求带了 body
+        payload = {
+            "model": "string"
+        }
+        
+        while True:
+            response = requests.get(url, headers=headers, json=payload)
+            print(response.text)
+            json_data = json.loads(response.text)
+            if 'status' in json_data:
+                if json_data['status'] == 'completed':
+                    video_url = json_data['metadata']["url"]
+                    return response.text, video_url
+                elif json_data['status'] == 'error':
+                    break
+            elif 'error' in json_data:
+                raise Exception(json_data['error']['code'])
+            time.sleep(30)
+        
+        return "", ""
+    
+    def poll_veo_task_status(self, task_id) -> tuple[str, str]:
         url = f"https://api.easyart.cc/v1/videos/{task_id}"
         veo_key = os.getenv("EASYART_DEFAULT_API_KEY")
         headers = {
@@ -2002,7 +2031,10 @@ class VideoCombine:
         
         print(f"任务提交成功，任务ID: {task_id}")
         print("开始轮询任务状态...")
-        response_text, video_url = self.poll_task_status(task_id)
+        if 'seedance' in model:
+            response_text, video_url = self.poll_veo_task_status(task_id)
+        else:
+            response_text, video_url = self.poll_seedance_task_status(task_id)
         if video_url == "":
             with open("debug/error_" + self.get_time_random_str()+".json", "w+") as f:
                 f.write(response_text)
