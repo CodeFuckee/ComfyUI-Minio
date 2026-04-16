@@ -1516,7 +1516,7 @@ class NanoBananaProCombine2:
             }
         }
         payload = json.dumps(payload_json)
-        max_retries = 3
+        max_retries = 1
         retryable_statuses = {429, 502, 503, 504}
         last_exception = None
         data = b""
@@ -1638,7 +1638,37 @@ class VideoCombine:
                         "default": "5",
                     },
                 ),
-                "aspectRatio": (["1:1", "3:2", "16:9", "9:16"],),
+                "first_frame_url": (
+                    "STRING",
+                    {
+                        "default": "",
+                    },
+                ),
+                "end_frame_url": (
+                    "STRING",
+                    {
+                        "default": "",
+                    },
+                ),
+                "images_url": (
+                    "STRING",
+                    {
+                        "default": "",
+                    },
+                ),
+                "videos_url": (
+                    "STRING",
+                    {
+                        "default": "",
+                    },
+                ),
+                "audios_url": (
+                    "STRING",
+                    {
+                        "default": "",
+                    },
+                ),
+                "aspectRatio": (["1:1", "3:2", "16:9", "9:16", "4:3", "3:4", "21:9", "adaptive"],),
                 "resolution": (["480p", "720p"],),
             },
         }
@@ -1821,6 +1851,85 @@ class VideoCombine:
             time.sleep(30)
         
         return "", ""
+
+    def create_seedance_task(self, model: str = 'doubao-seedance-2-0-fast-260128', prompt: str = '', second: int = 5, ratio: str = 'adaptive', first_frame_url: str = '', end_frame_url: str ='', images_url: list = [], videos_url: list = [], audios_url: list = []):
+        seedance_key= os.getenv("EASYART_DEFAULT_API_KEY")
+        conn = http.client.HTTPSConnection("api.easyart.cc")
+        content = [
+            {
+                "type": "text",
+                "text": prompt
+            },
+        ]
+        if first_frame_url != "":
+            content.append(
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": first_frame_url
+                    },
+                    "role": "first_frame"
+                }                
+            )
+        if end_frame_url != "":
+            content.append(
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": end_frame_url
+                    },
+                    "role": "last_frame"
+                }                
+            )
+        for image in images_url:
+            content.append(
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": image
+                    },
+                    "role": "reference_image"
+                }                
+            )
+        for video in videos_url:
+            content.append(
+                {
+                    "type": "video_url",
+                    "video_url": {
+                        "url": video
+                    },
+                    "role": "reference_video"
+                }                
+            )
+        for audio in audios_url:
+            content.append(
+                {
+                    "type": "audio_url",
+                    "audio_url": {
+                        "url": audio
+                    },
+                    "role": "reference_audio"
+                }                
+            )
+        payload = json.dumps({
+            "model": model,
+            "content": content,
+            "generate_audio": True,
+            "ratio": ratio,
+            "duration": second,
+            "watermark": False
+        })
+        headers = {
+            'Authorization': f'Bearer {seedance_key}',
+            'Content-Type': 'application/json'
+        }
+        conn.request("POST", "/v1/videos", payload, headers)
+        res = conn.getresponse()
+        data = res.read()
+        text = data.decode("utf-8")
+        print(text)
+        json_data = json.loads(text)
+        return json_data
     
     def get_time_random_str(self) -> str:
         """
@@ -1835,8 +1944,19 @@ class VideoCombine:
         # 3. 拼接成最终字符串（用下划线分隔，方便阅读）
         result = f"{time_str}_{random_16}"
         return result
+    
+    def str2urls(self, text: str) -> list[str]:
+        result = []
+        if text == "":
+            result = []
+        else:
+            try:
+                result = json.loads(text)
+            except:
+                result = []
+        return result
 
-    def main(self, line: str, model: str, imageBase64: str, imageBase64_1: str, prompt: str, second: str, aspectRatio: str = '9:16', resolution: str = '480p'):
+    def main(self, line: str, model: str, imageBase64: str, imageBase64_1: str, prompt: str, second: str, aspectRatio: str = '9:16', resolution: str = '480p', first_frame_url = '', end_frame_url = '', images_url = "", videos_url = "", audios_url = ""):
         image_paths = []
         if imageBase64 != '-1' and imageBase64 != '':
             file_name = "temp/" + self.get_time_random_str() + ".png"
@@ -1848,15 +1968,18 @@ class VideoCombine:
             self.base64_to_image(imageBase64, file_name)
             image_paths.append(file_name)
         
-        max_retries = 3
-        last_exception = None
-        data = b""
-        res_status = None
+        max_retries = 1
         task_id = ""
         result = ""
         for attempt in range(max_retries):
             try:
-                result = self.create_veo_task(model, prompt, second, aspectRatio, image_paths)
+                if 'veo' in model:
+                    result = self.create_veo_task(model, prompt, second, aspectRatio, image_paths)
+                elif 'seedance' in model:
+                    images_url = self.str2urls(images_url)
+                    videos_url = self.str2urls(videos_url)
+                    audios_url = self.str2urls(audios_url)
+                    result = self.create_seedance_task(model, prompt, second, aspectRatio, first_frame_url, end_frame_url, images_url, videos_url, audios_url)
                 if 'id' in result:
                     task_id = result['id']
                     break
@@ -1867,7 +1990,6 @@ class VideoCombine:
                 
             except Exception as e:
                 print('请求失败'+str(e))
-                last_exception = e
                 if attempt < (max_retries - 1):
                     time.sleep(2 ** attempt)
                     continue
