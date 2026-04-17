@@ -2032,9 +2032,9 @@ class VideoCombine:
         print(f"任务提交成功，任务ID: {task_id}")
         print("开始轮询任务状态...")
         if 'seedance' in model:
-            response_text, video_url = self.poll_veo_task_status(task_id)
-        else:
             response_text, video_url = self.poll_seedance_task_status(task_id)
+        else:
+            response_text, video_url = self.poll_veo_task_status(task_id)
         if video_url == "":
             with open("debug/error_" + self.get_time_random_str()+".json", "w+") as f:
                 f.write(response_text)
