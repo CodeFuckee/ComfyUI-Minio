@@ -113,7 +113,7 @@ class NanoBananaProCombine2:
         model = model.lower()
         return model_dict[line][model]
     
-    def save_response_when_except(self, decoded_data: str):
+    def save_response_when_except(self, decoded_data: str) -> str:
         ts = time.strftime("%Y%m%d%H%M%S", time.localtime())
         rand6 = f"{secrets.randbelow(1000000):06d}"
         debug_name = f"{ts}{rand6}.json"
@@ -121,16 +121,19 @@ class NanoBananaProCombine2:
             decoded_data,
             encoding="utf-8",
         )
+        return debug_name
     
     def handle_image_url_result(self, decoded_data: str, img_url: str):
         try:
             import urllib.request
+            print(f'结果图片{img_url}')
             with urllib.request.urlopen(img_url) as resp:
                 img_data = resp.read()
             img_base64 = base64.b64encode(img_data).decode('utf-8')
             return (decoded_data, img_base64,)
         except Exception as e:
-            self.save_response_when_except(decoded_data)
+            json_path = self.save_response_when_except(decoded_data)
+            print(str(e) + json_path)
             raise
 
     def handle_response(self, decoded_data: str):
