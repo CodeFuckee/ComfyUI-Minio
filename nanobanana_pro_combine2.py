@@ -340,11 +340,46 @@ class NanoBananaProCombine2:
         if 'nano banana' in model:
             return self.handle_banana(line, model, mimeType, imageBase64, imageBase64_1, prompt, aspectRatio, imageSize)
         elif 'gpt image' in model:
-            if images_url == '-1' or images_url == '':
-                imageUrls = []
-            else:
-                imageUrls = json.loads(images_url)
+            imageUrls = self.parse_image_urls(images_url)
             return self.handle_gpt_image(line, imageUrls, prompt, aspectRatio)
+
+    def parse_image_urls(self, images_url):
+        if images_url is None:
+            return []
+        if isinstance(images_url, list):
+            return images_url
+        if not isinstance(images_url, str):
+            images_url = str(images_url)
+        raw = images_url.strip()
+        if raw == '' or raw == '-1':
+            return []
+
+        def try_load(s):
+            try:
+                return json.loads(s)
+            except Exception:
+                return None
+
+        value = try_load(raw)
+        if value is None:
+            return [raw]
+
+        for _ in range(2):
+            if isinstance(value, str):
+                inner = value.strip()
+                next_value = try_load(inner)
+                if next_value is None:
+                    break
+                value = next_value
+            else:
+                break
+
+        if isinstance(value, list):
+            return value
+        if isinstance(value, str):
+            value = value.strip()
+            return [value] if value else []
+        return []
 
 # test = NanoBananaProCombine2()
 # a = ''
