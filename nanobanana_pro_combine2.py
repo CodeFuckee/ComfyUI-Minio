@@ -126,8 +126,10 @@ class NanoBananaProCombine2:
     def handle_image_url_result(self, decoded_data: str, img_url: str):
         try:
             import urllib.request
+            import ssl
             print(f'结果图片{img_url}')
-            with urllib.request.urlopen(img_url) as resp:
+            ctx = ssl._create_unverified_context()
+            with urllib.request.urlopen(img_url, context=ctx) as resp:
                 img_data = resp.read()
             img_base64 = base64.b64encode(img_data).decode('utf-8')
             return (decoded_data, img_base64,)
@@ -341,6 +343,7 @@ class NanoBananaProCombine2:
             return self.handle_banana(line, model, mimeType, imageBase64, imageBase64_1, prompt, aspectRatio, imageSize)
         elif 'gpt image' in model:
             imageUrls = self.parse_image_urls(images_url)
+            print(f'gpt image imageUrls:{imageUrls}')
             return self.handle_gpt_image(line, imageUrls, prompt, aspectRatio)
 
     def parse_image_urls(self, images_url):
