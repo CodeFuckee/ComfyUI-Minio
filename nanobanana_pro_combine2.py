@@ -113,12 +113,25 @@ class NanoBananaProCombine2:
         model = model.lower()
         return model_dict[line][model]
     
+    def save_response_when_except(self, decoded_data: str):
+        ts = time.strftime("%Y%m%d%H%M%S", time.localtime())
+        rand6 = f"{secrets.randbelow(1000000):06d}"
+        debug_name = f"{ts}{rand6}.json"
+        Path(debug_name).write_text(
+            decoded_data,
+            encoding="utf-8",
+        )
+    
     def handle_image_url_result(self, decoded_data: str, img_url: str):
-        import urllib.request
-        with urllib.request.urlopen(img_url) as resp:
-            img_data = resp.read()
-        img_base64 = base64.b64encode(img_data).decode('utf-8')
-        return (decoded_data, img_base64,)
+        try:
+            import urllib.request
+            with urllib.request.urlopen(img_url) as resp:
+                img_data = resp.read()
+            img_base64 = base64.b64encode(img_data).decode('utf-8')
+            return (decoded_data, img_base64,)
+        except Exception as e:
+            self.save_response_when_except(decoded_data)
+            raise
 
     def handle_response(self, decoded_data: str):
         data = json.loads(decoded_data)
@@ -158,13 +171,7 @@ class NanoBananaProCombine2:
                                 continue
                         text = re.sub(r"data:image/[^;]+;base64,", "", text).strip()
                         return (decoded_data, text,)
-        ts = time.strftime("%Y%m%d%H%M%S", time.localtime())
-        rand6 = f"{secrets.randbelow(1000000):06d}"
-        debug_name = f"{ts}{rand6}.json"
-        Path(debug_name).write_text(
-            decoded_data,
-            encoding="utf-8",
-        )
+        self.save_response_when_except(decoded_data)
         raise ValueError(f"no img debug file {debug_name}")
     
     def handle_banana(self, line: str, model: str, mimeType: str, imageBase64: str, imageBase64_1: str, prompt: str, aspectRatio: str = '9:16', imageSize: str = '2k'):
@@ -226,7 +233,7 @@ class NanoBananaProCombine2:
                 decoded_data_test = data.decode("utf-8", errors="replace") if data else ""
                 if res_status == 200 and decoded_data_test != "":
                     break
-                print(f'状态码{res_status}')
+                print(f'状态码{res_status} decoded_data_test:{decoded_data_test}')
                 if res_status in retryable_statuses and attempt < (max_retries - 1):
                     time.sleep(2 ** attempt)
                     continue
