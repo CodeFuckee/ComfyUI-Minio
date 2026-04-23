@@ -1,16 +1,12 @@
 import os
 import re
-import cv2
 import json
 import time
-import torch
 import base64
 import secrets
+import requests
 import http.client
-import numpy as np
 from pathlib import Path
-from PIL import Image
-from io import BytesIO
 
 
 class NanoBananaProCombine2:
@@ -20,7 +16,7 @@ class NanoBananaProCombine2:
         return {
             "required": {
                 "line": (["fast", "stable", "economy", "cheap"],),
-                "model": (["nano banana 2", "nano banana pro"],),
+                "model": (["nano banana 2", "nano banana pro", "gpt image 2"],),
                 "mimeType": (
                     "STRING",
                     {
@@ -37,6 +33,12 @@ class NanoBananaProCombine2:
                     "STRING",
                     {
                         "default": "-1",
+                    },
+                ),
+                "images_url": (
+                    "STRING",
+                    {
+                        "default": "",
                     },
                 ),
                 "prompt": (
@@ -110,6 +112,13 @@ class NanoBananaProCombine2:
         }
         model = model.lower()
         return model_dict[line][model]
+    
+    def handle_image_url_result(self, decoded_data: str, img_url: str):
+        import urllib.request
+        with urllib.request.urlopen(img_url) as resp:
+            img_data = resp.read()
+        img_base64 = base64.b64encode(img_data).decode('utf-8')
+        return (decoded_data, img_base64,)
 
     def handle_response(self, decoded_data: str):
         data = json.loads(decoded_data)
@@ -131,12 +140,7 @@ class NanoBananaProCombine2:
                         match = re.search(pattern, s)
                         if match:
                             img_url = match.group()
-                            # 下载图片URL并转为base64
-                            import urllib.request
-                            with urllib.request.urlopen(img_url) as resp:
-                                img_data = resp.read()
-                            img_base64 = base64.b64encode(img_data).decode('utf-8')
-                            return (decoded_data, img_base64,)
+                            return self.handle_image_url_result(decoded_data, img_url)
                     if 'inlineData' in part:
                         inlineData = part['inlineData']
                         if 'data' not in inlineData:
@@ -162,8 +166,8 @@ class NanoBananaProCombine2:
             encoding="utf-8",
         )
         raise ValueError(f"no img debug file {debug_name}")
-
-    def main(self, line: str, model: str, mimeType: str, imageBase64: str, imageBase64_1: str, prompt: str, aspectRatio: str = '9:16', imageSize: str = '2k'):
+    
+    def handle_banana(self, line: str, model: str, mimeType: str, imageBase64: str, imageBase64_1: str, prompt: str, aspectRatio: str = '9:16', imageSize: str = '2k'):
         parts = [
             {
                 "text": f"{prompt}"
@@ -244,6 +248,93 @@ class NanoBananaProCombine2:
         if res_status != 200:
             raise RuntimeError(f"请求失败，重试后仍未成功: {last_exception}")
         return self.handle_response(decoded_data)
+    
+    def handle_gpt_image(self, line: str, imageUrls: list[str], prompt: str, aspectRatio: str):
+        decode_data = ''
+        result_data = ''
+        if line == 'cheap':
+            api_key = os.getenv("GRSAI_API_KEY")
+            if not api_key:
+                raise RuntimeError("缺少环境变量 GRSAI_API_KEY")
+            url = "https://grsai.dakka.com.cn/v1/draw/completions"
+            payload = {
+                "model": "gpt-image-2",
+                "prompt": prompt,
+                "n": 1,
+                "response_format": "url",
+                "image": imageUrls,
+                "size": aspectRatio,
+                "webHook": "https://douniwan.com"
+            }
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            }
+            response = requests.post(url, headers=headers, json=payload, timeout=600)
+            response.raise_for_status()
+            data = response.json()
+            # with open("response.json", "w", encoding="utf-8") as f:
+            #     json.dump(data, f, ensure_ascii=False, indent=2)
+            decode_data = json.dumps(data, ensure_ascii=False, indent=2)
+            print(decode_data)
+            deadline = time.time() + 600
+            while True:
+                if time.time() > deadline:
+                    break
+                if 'data' in data and 'id' in data['data']:
+                    id = data['data']['id']
+                    result_url = "https://grsai.dakka.com.cn/v1/draw/result"
+                    result_response = requests.post(result_url, headers=headers, json={"id":id}, timeout=600)
+                    result_data = result_response.json()
+                    if 'data' in result_data and 'status' in result_data['data']:
+                        status = result_data['data']['status']
+                        if status == 'success' or status == 'succeeded':
+                            img_results = result_data['data']['results']
+                            for img_result in img_results:
+                                if 'url' in img_result:
+                                    url = img_result['url']
+                                    return self.handle_image_url_result(decode_data, url)
+                        elif status == 'failed':
+                            raise TimeoutError(f"运行失败 任务提交响应数据:{decode_data} result:{result_data}")
+                    time.sleep(10)
+            raise TimeoutError(f"超时 任务提交响应数据:{decode_data} result:{result_data}")
+        else:
+            api_key = os.getenv("EASYART_API_KEY")
+            if not api_key:
+                raise RuntimeError("缺少环境变量 EASYART_API_KEY")
+            url = "https://api.easyart.cc/v1/images/generations"
+            payload = {
+                "model": "gpt-image-2",
+                "prompt": prompt,
+                "n": 1,
+                "response_format": "url",
+                "image": imageUrls,
+            }
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            }
+            response = requests.post(url, headers=headers, json=payload, timeout=600)
+            response.raise_for_status()
+            data = response.json()
+            if 'data' in data and isinstance(data['data'], list):
+                for item in data['data']:
+                    img_url = item['url']
+                    return self.handle_image_url_result(json.dumps(data), img_url)
+            else:
+                raise ValueError(f"响应数据没有图片 {data}")
+        
+        raise Exception(f"未知错误 {line} {imageUrls} {prompt} {aspectRatio}")
+
+    def main(self, line: str, model: str, mimeType: str, imageBase64: str, imageBase64_1: str, images_url: str, prompt: str, aspectRatio: str = '9:16', imageSize: str = '2k'):
+        if 'nano banana' in model:
+            return self.handle_banana(line, model, mimeType, imageBase64, imageBase64_1, prompt, aspectRatio, imageSize)
+        elif 'gpt image' in model:
+            if images_url == '-1' or images_url == '':
+                imageUrls = []
+            else:
+                imageUrls = json.loads(images_url)
+            return self.handle_gpt_image(line, imageUrls, prompt, aspectRatio)
 
 # test = NanoBananaProCombine2()
 # a = ''
