@@ -128,6 +128,26 @@ class NanoBananaProCombine2:
             import urllib.request
             import ssl
             print(f'结果图片{img_url}')
+            if isinstance(img_url, str):
+                raw = img_url.strip()
+                if raw.startswith("data:image/"):
+                    raw = re.sub(r"^data:image/[^;]+;base64,", "", raw).strip()
+                cleaned = re.sub(r"\s+", "", raw)
+                if cleaned and not raw.startswith("http://") and not raw.startswith("https://"):
+                    pad = (-len(cleaned)) % 4
+                    if pad:
+                        cleaned = cleaned + ("=" * pad)
+                    img_data = None
+                    try:
+                        img_data = base64.b64decode(cleaned, validate=True)
+                    except Exception:
+                        try:
+                            img_data = base64.urlsafe_b64decode(cleaned)
+                        except Exception:
+                            img_data = None
+                    if img_data is not None:
+                        img_base64 = base64.b64encode(img_data).decode('utf-8')
+                        return (decoded_data, img_base64,)
             ctx = ssl._create_unverified_context()
             with urllib.request.urlopen(img_url, context=ctx) as resp:
                 img_data = resp.read()
