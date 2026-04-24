@@ -294,7 +294,7 @@ class NanoBananaProCombine2:
                 "prompt": prompt,
                 "n": 1,
                 "response_format": "url",
-                "image": imageUrls,
+                "urls": imageUrls,
                 "size": aspectRatio,
                 "webHook": "https://douniwan.com"
             }
