@@ -196,7 +196,7 @@ class NanoBananaProCombine2:
                                 continue
                         text = re.sub(r"data:image/[^;]+;base64,", "", text).strip()
                         return (decoded_data, text,)
-        self.save_response_when_except(decoded_data)
+        debug_name = self.save_response_when_except(decoded_data)
         raise ValueError(f"no img debug file {debug_name}")
     
     def handle_banana(self, line: str, model: str, mimeType: str, imageBase64: str, imageBase64_1: str, prompt: str, aspectRatio: str = '9:16', imageSize: str = '2k'):
@@ -252,7 +252,7 @@ class NanoBananaProCombine2:
                 model_name = self.get_model_name(line, model)
                 conn = http.client.HTTPSConnection(api_host, timeout=600)
                 conn.request("POST", f"/v1beta/models/{model_name}:generateContent", payload, headers)
-                res = conn.getresponse()
+                res: http.client.HTTPResponse = conn.getresponse()
                 res_status = getattr(res, "status", None)
                 data = res.read()
                 decoded_data_test = data.decode("utf-8", errors="replace") if data else ""
@@ -263,6 +263,33 @@ class NanoBananaProCombine2:
                     time.sleep(2 ** attempt)
                     continue
                 error_text = data.decode("utf-8", errors="replace") if data else ""
+                if res_status == 200 and decoded_data_test == "":
+                    print("="*50)
+                    print("【1】基础响应状态")
+                    print(f"HTTP 状态码: {res.status}")
+                    print(f"HTTP 状态描述: {res.reason}")  # 200 对应 OK，隐性异常会有隐藏描述
+                    print(f"HTTP 协议版本: {res.version}")
+
+                    print("\n【2】完整响应头（最重要！）")
+                    response_headers = res.getheaders()  # 获取所有响应头
+                    for key, value in response_headers:
+                        print(f"{key}: {value}")
+
+                    print("\n【3】传输关键信息（排查空响应核心）")
+                    print(f"内容长度(Content-Length): {res.getheader('Content-Length', '未返回')}")  # 0=服务端故意返回空
+                    print(f"传输编码(Transfer-Encoding): {res.getheader('Transfer-Encoding', '未返回')}")  # chunked=流式响应
+                    print(f"连接状态(Connection): {res.getheader('Connection', '未返回')}")
+
+                    print("\n【4】谷歌 API 专属调试信息")
+                    print(f"请求ID(Request-ID): {res.getheader('X-Google-Request-ID', '未返回')}")  # 拿去谷歌后台查日志
+                    print(f"API 服务状态: {res.getheader('X-Google-Api-Environment', '未返回')}")
+
+                    # ========== 读取响应体（确保只读取一次） ==========
+                    print(f"\n【5】原始响应数据: {data}")  # 空则为 b''
+                    decoded_data_test = data.decode("utf-8", errors="replace") if data else ""
+                    print(f"【6】解码后数据: {decoded_data_test}")
+                    print("="*50)
+                
                 raise RuntimeError(f"请求失败，状态码: {res_status}, 响应: {error_text[:2000]}")
             except Exception as e:
                 print('请求失败' + str(e))
