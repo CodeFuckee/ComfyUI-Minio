@@ -180,43 +180,46 @@ class NanoBananaProCombine2:
             raise RuntimeError(f"下载/解析结果图片失败，图片URL: {img_url[:500]}, 调试文件: {json_path}, 原始错误: {e}") from e
 
     def handle_response(self, decoded_data: str):
-        data = json.loads(decoded_data)
-        if 'candidates' in data and isinstance(data['candidates'], list):
-            candidates = data['candidates']
-            for candidate in candidates:
-                if 'content' not in candidate:
-                    continue
-                content = candidate['content']
-                if 'parts' not in content or not isinstance(content['parts'], list):
-                    continue
-                parts = content['parts']
-                for part in parts:
-                    if not isinstance(part, dict):
+        try:
+            data = json.loads(decoded_data)
+            if 'candidates' in data and isinstance(data['candidates'], list):
+                candidates = data['candidates']
+                for candidate in candidates:
+                    if 'content' not in candidate:
                         continue
-                    if 'text' in part:
-                        s = part['text']
-                        pattern = r'https?://[^\s)]+'
-                        match = re.search(pattern, s)
-                        if match:
-                            img_url = match.group()
-                            return self.handle_image_url_result(decoded_data, img_url)
-                    if 'inlineData' in part:
-                        inlineData = part['inlineData']
-                        if 'data' not in inlineData:
+                    content = candidate['content']
+                    if 'parts' not in content or not isinstance(content['parts'], list):
+                        continue
+                    parts = content['parts']
+                    for part in parts:
+                        if not isinstance(part, dict):
                             continue
-                        text ="\n".join(str(inlineData['data']))
-                        pattern = re.compile(r"data:image/(?P<ext>png|jpeg|jpg|webp|gif);base64,(?P<b64>[A-Za-z0-9+/=\s]+)")
-                        matches = list(pattern.finditer(text))
-                        if not matches:
-                            cleaned = re.sub(r"\s+", "", text)
-                            if not cleaned:
+                        if 'text' in part:
+                            s = part['text']
+                            pattern = r'https?://[^\s)]+'
+                            match = re.search(pattern, s)
+                            if match:
+                                img_url = match.group()
+                                return self.handle_image_url_result(decoded_data, img_url)
+                        if 'inlineData' in part:
+                            inlineData = part['inlineData']
+                            if 'data' not in inlineData:
                                 continue
-                            text = f"data:image/png;base64,{cleaned}"
+                            text ="\n".join(str(inlineData['data']))
+                            pattern = re.compile(r"data:image/(?P<ext>png|jpeg|jpg|webp|gif);base64,(?P<b64>[A-Za-z0-9+/=\s]+)")
                             matches = list(pattern.finditer(text))
                             if not matches:
-                                continue
-                        text = re.sub(r"data:image/[^;]+;base64,", "", text).strip()
-                        return (decoded_data, text,)
+                                cleaned = re.sub(r"\s+", "", text)
+                                if not cleaned:
+                                    continue
+                                text = f"data:image/png;base64,{cleaned}"
+                                matches = list(pattern.finditer(text))
+                                if not matches:
+                                    continue
+                            text = re.sub(r"data:image/[^;]+;base64,", "", text).strip()
+                            return (decoded_data, text,)
+        except Exception as e:
+            pass
         debug_name = self.save_response_when_except(decoded_data)
         api_error = self._extract_api_error(decoded_data)
         raise ValueError(f"API响应中未找到图片数据，调试文件: {debug_name}{api_error}")
