@@ -4,6 +4,7 @@ import json
 import time
 import base64
 import secrets
+import sys
 import requests
 import http.client
 from pathlib import Path
@@ -316,14 +317,32 @@ class NanoBananaProCombine2:
 
                 # 构建包含API错误信息的详细错误消息
                 api_error = self._extract_api_error(error_text)
-                raise RuntimeError(f"请求失败，状态码: {res_status}, 请求ID: {res.getheader('X-Google-Request-ID', '未知')}{api_error}")
-            except Exception as e:
-                print('请求失败' + str(e))
-                last_exception = e
+                error_parts = [f"请求失败，状态码: {res_status}"]
+                if hasattr(res, 'reason') and res.reason:
+                    error_parts.append(f"状态描述: {res.reason}")
+                request_id = res.getheader('X-Google-Request-ID', '')
+                if request_id:
+                    error_parts.append(f"请求ID: {request_id}")
+                if api_error:
+                    error_parts.append(api_error.lstrip(', '))
+                elif error_text:
+                    error_parts.append(f"响应报文: {error_text[:2000]}")
+                raise RuntimeError("，".join(error_parts))
+            except RuntimeError:
+                last_exception = sys.exc_info()[1]
+                print(f'请求失败: {last_exception}')
                 if attempt < (max_retries - 1):
                     time.sleep(2 ** attempt)
                     continue
                 raise
+            except Exception as e:
+                error_msg = f"请求连接异常: {str(e)}"
+                print(error_msg)
+                last_exception = RuntimeError(error_msg)
+                if attempt < (max_retries - 1):
+                    time.sleep(2 ** attempt)
+                    continue
+                raise last_exception from e
             finally:
                 try:
                     conn.close()
@@ -332,7 +351,12 @@ class NanoBananaProCombine2:
         decoded_data = data.decode("utf-8", errors="replace") if data else ""
         if res_status != 200:
             api_error = self._extract_api_error(decoded_data)
-            raise RuntimeError(f"请求失败，重试{max_retries}次后仍未成功，最后状态码: {res_status}{api_error}")
+            error_msg = f"请求失败，重试{max_retries}次后仍未成功，最后状态码: {res_status}"
+            if api_error:
+                error_msg += api_error
+            elif decoded_data:
+                error_msg += f"，响应报文: {decoded_data[:2000]}"
+            raise RuntimeError(error_msg)
         return self.handle_response(decoded_data)
     
     def handle_gpt_image(self, line: str, imageUrls: list[str], prompt: str, aspectRatio: str):
@@ -363,7 +387,13 @@ class NanoBananaProCombine2:
                 api_error = self._extract_api_error(response.text if response is not None else "")
                 raise RuntimeError(f"gpt-image创建任务失败，状态码: {response.status_code}{api_error}") from e
             except requests.exceptions.RequestException as e:
-                raise RuntimeError(f"gpt-image创建任务网络异常: {e}") from e
+                error_msg = f"gpt-image创建任务网络异常: {e}"
+                if e.response is not None:
+                    error_msg += f"，状态码: {e.response.status_code}"
+                    api_error = self._extract_api_error(e.response.text)
+                    if api_error:
+                        error_msg += api_error
+                raise RuntimeError(error_msg) from e
 
             try:
                 data = response.json()
@@ -390,7 +420,13 @@ class NanoBananaProCombine2:
                     api_error = self._extract_api_error(result_response.text if result_response is not None else "")
                     raise RuntimeError(f"gpt-image查询结果失败，任务ID: {id}, 状态码: {result_response.status_code}{api_error}") from e
                 except requests.exceptions.RequestException as e:
-                    raise RuntimeError(f"gpt-image查询结果网络异常，任务ID: {id}: {e}") from e
+                    error_msg = f"gpt-image查询结果网络异常，任务ID: {id}: {e}"
+                    if e.response is not None:
+                        error_msg += f"，状态码: {e.response.status_code}"
+                        api_error = self._extract_api_error(e.response.text)
+                        if api_error:
+                            error_msg += api_error
+                    raise RuntimeError(error_msg) from e
                 except json.JSONDecodeError as e:
                     raise RuntimeError(f"gpt-image查询结果响应JSON解析失败，任务ID: {id}, 响应内容: {result_response.text[:1000]}") from e
 
@@ -430,7 +466,13 @@ class NanoBananaProCombine2:
                 api_error = self._extract_api_error(response.text if response is not None else "")
                 raise RuntimeError(f"gpt-image(easyart)请求失败，状态码: {response.status_code}{api_error}") from e
             except requests.exceptions.RequestException as e:
-                raise RuntimeError(f"gpt-image(easyart)网络异常: {e}") from e
+                error_msg = f"gpt-image(easyart)网络异常: {e}"
+                if e.response is not None:
+                    error_msg += f"，状态码: {e.response.status_code}"
+                    api_error = self._extract_api_error(e.response.text)
+                    if api_error:
+                        error_msg += api_error
+                raise RuntimeError(error_msg) from e
 
             try:
                 data = response.json()
